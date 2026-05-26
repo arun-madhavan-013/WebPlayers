@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M3U8 Player</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 32px 16px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 24px;
+      letter-spacing: 0.05em;
+      color: #ccc;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 16px;
+    }
+
+    .controls input {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #eee;
+      outline: none;
+    }
+
+    .controls input:focus { border-color: #0af; }
+
+    .controls button {
+      padding: 10px 20px;
+      font-size: 0.95rem;
+      background: #0af;
+      color: #111;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .controls button:hover { background: #08d; }
+
+    video {
+      width: 100%;
+      max-width: 860px;
+      background: #000;
+      border-radius: 8px;
+      outline: none;
+    }
+
+    #status {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #888;
+      min-height: 1.2em;
+    }
+
+    #status.error { color: #f66; }
+
+    #abrPanel {
+      display: none;
+      width: 100%;
+      max-width: 860px;
+      margin-top: 14px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 0.82rem;
+    }
+
+    #abrPanel h2 {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .abr-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .abr-row label { color: #888; }
+
+    #levelSelect {
+      padding: 6px 10px;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 5px;
+      color: #eee;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    #currentLevel {
+      color: #0af;
+      font-weight: 600;
+    }
+
+    #levelTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    #levelTable th, #levelTable td {
+      text-align: left;
+      padding: 5px 8px;
+      border-bottom: 1px solid #2a2a2a;
+      color: #bbb;
+    }
+
+    #levelTable th { color: #666; font-weight: 500; }
+
+    #levelTable tr.active td { color: #0af; font-weight: 600; }
+
+    #credit {
+      width: 100%;
+      max-width: 860px;
+      margin-top: 16px;
+      font-size: 0.78rem;
+      color: #555;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    #credit a { color: #667; text-decoration: underline; }
+    #credit a:hover { color: #99a; }
+  </style>
+</head>
+<body>
+  <h1>M3U8 Player</h1>
+
+  <div class="controls">
+    <input id="urlInput" type="text" value="https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8" />
+    <button id="loadBtn">Load</button>
+  </div>
+
+  <video id="video" controls></video>
+  <p id="status"></p>
+
+  <div id="abrPanel">
+    <h2>ABR / Quality Levels</h2>
+    <div class="abr-row">
+      <label>Mode:</label>
+      <select id="levelSelect"><option value="-1">Auto (ABR)</option></select>
+      <label>Active level:</label>
+      <span id="currentLevel">—</span>
+    </div>
+    <table id="levelTable">
+      <thead><tr><th>#</th><th>Resolution</th><th>Bitrate</th><th>Codec</th></tr></thead>
+      <tbody id="levelBody"></tbody>
+    </table>
+  </div>
+
+  <p id="credit">
+    Demo asset: <strong>Tears of Steel</strong> &mdash;
+    &copy; <a href="https://mango.blender.org" target="_blank" rel="noopener">Blender Foundation / Mango Open Movie Project</a>,
+    licensed under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>.<br>
+    Streamed via <a href="https://www.unified-streaming.com" target="_blank" rel="noopener">Unified Streaming</a> demo origin.<br>
+    HLS playback powered by <a href="https://github.com/video-dev/hls.js" target="_blank" rel="noopener">hls.js</a>,
+    licensed under <a href="https://github.com/video-dev/hls.js/blob/master/LICENSE" target="_blank" rel="noopener">Apache 2.0</a>,
+    served via <a href="https://www.jsdelivr.com" target="_blank" rel="noopener">jsDelivr CDN</a>.
+  </p>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+  <script>
+    const video   = document.getElementById('video');
+    const urlInput = document.getElementById('urlInput');
+    const loadBtn  = document.getElementById('loadBtn');
+    const status   = document.getElementById('status');
+
+    let hls = null;
+
+    const abrPanel    = document.getElementById('abrPanel');
+    const levelSelect = document.getElementById('levelSelect');
+    const currentLevelEl = document.getElementById('currentLevel');
+    const levelBody   = document.getElementById('levelBody');
+
+    function setStatus(msg, isError) {
+      status.textContent = msg;
+      status.className = isError ? 'error' : '';
+    }
+
+    function fmtBitrate(bps) {
+      if (!bps) return '—';
+      return bps >= 1e6 ? (bps / 1e6).toFixed(2) + ' Mbps' : Math.round(bps / 1e3) + ' kbps';
+    }
+
+    function buildLevelUI(levels) {
+      // Populate select
+      levelSelect.innerHTML = '<option value="-1">Auto (ABR)</option>';
+      levelBody.innerHTML = '';
+      levels.forEach((l, i) => {
+        const res  = (l.width && l.height) ? l.width + '×' + l.height : '—';
+        const bps  = fmtBitrate(l.bitrate);
+        const codec = l.videoCodec || l.audioCodec || '—';
+        const opt  = document.createElement('option');
+        opt.value  = i;
+        opt.textContent = i + ': ' + res + ' @ ' + bps;
+        levelSelect.appendChild(opt);
+        const tr = document.createElement('tr');
+        tr.id = 'lvl-' + i;
+        tr.innerHTML = '<td>' + i + '</td><td>' + res + '</td><td>' + bps + '</td><td>' + codec + '</td>';
+        levelBody.appendChild(tr);
+      });
+      abrPanel.style.display = 'block';
+    }
+
+    function updateActiveLevel(idx) {
+      if (idx < 0 || !hls) return;
+      const l = hls.levels[idx];
+      const res = (l && l.width && l.height) ? l.width + '×' + l.height : idx;
+      currentLevelEl.textContent = idx + ': ' + res + ' @ ' + fmtBitrate(l ? l.bitrate : 0);
+      document.querySelectorAll('#levelTable tr').forEach(r => r.classList.remove('active'));
+      const row = document.getElementById('lvl-' + idx);
+      if (row) row.classList.add('active');
+    }
+
+    function loadStream(url) {
+      url = url.trim();
+      if (!url) { setStatus('Please enter a URL.', true); return; }
+
+      // Tear down previous instance
+      if (hls) { hls.destroy(); hls = null; }
+      video.src = '';
+      abrPanel.style.display = 'none';
+      levelSelect.innerHTML = '<option value="-1">Auto (ABR)</option>';
+      levelBody.innerHTML = '';
+      currentLevelEl.textContent = '—';
+      setStatus('Loading…');
+
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          startLevel: -1,          // let ABR choose the first level
+          abrEwmaDefaultEstimate: 500000,  // conservative initial BW estimate
+          capLevelToPlayerSize: true       // never request higher res than player size
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+          buildLevelUI(hls.levels);
+          currentLevelEl.textContent = 'Auto — waiting…';
+          setStatus('Manifest loaded — ' + hls.levels.length + ' quality level(s). Playing.');
+          video.play().catch(() => {});
+        });
+
+        // Fired by ABR controller whenever the active rendition changes
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
+          updateActiveLevel(data.level);
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                setStatus('Network error — trying to recover…', true);
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                setStatus('Media error — trying to recover…', true);
+                hls.recoverMediaError();
+                break;
+              default:
+                setStatus('Fatal error: ' + data.details, true);
+                hls.destroy();
+            }
+          }
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Native HLS (Safari / iOS)
+        video.src = url;
+        video.addEventListener('loadedmetadata', () => {
+          setStatus('Manifest loaded — playing.');
+          video.play().catch(() => {});
+        }, { once: true });
+      } else {
+        setStatus('HLS is not supported in this browser.', true);
+      }
+    }
+
+    // Manual quality override
+    levelSelect.addEventListener('change', () => {
+      if (hls) {
+        hls.currentLevel = parseInt(levelSelect.value, 10);
+        if (hls.currentLevel === -1) {
+          currentLevelEl.textContent = 'Auto — waiting…';
+          document.querySelectorAll('#levelTable tr').forEach(r => r.classList.remove('active'));
+        }
+      }
+    });
+
+    loadBtn.addEventListener('click', () => loadStream(urlInput.value));
+
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') loadStream(urlInput.value);
+    });
+
+    // Auto-load the pre-filled URL on page start
+    loadStream(urlInput.value);
+  </script>
+</body>
+</html>
