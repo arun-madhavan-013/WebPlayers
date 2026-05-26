@@ -29,7 +29,7 @@
       display: flex;
       gap: 8px;
       width: 100%;
-      max-width: 860px;
+      max-width: 1280px;
       margin-bottom: 16px;
     }
 
@@ -60,11 +60,20 @@
 
     .controls button:hover { background: #08d; }
 
-    video {
-      width: 100%;
-      max-width: 860px;
+    .video-shell {
+      width: min(100%, 1280px);
+      aspect-ratio: 16 / 9;
       background: #000;
       border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .video-shell video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #000;
       outline: none;
     }
 
@@ -77,69 +86,9 @@
 
     #status.error { color: #f66; }
 
-    #abrPanel {
-      display: none;
-      width: 100%;
-      max-width: 860px;
-      margin-top: 14px;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 14px 16px;
-      font-size: 0.82rem;
-    }
-
-    #abrPanel h2 {
-      font-size: 0.9rem;
-      color: #aaa;
-      margin-bottom: 10px;
-      letter-spacing: 0.04em;
-    }
-
-    .abr-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .abr-row label { color: #888; }
-
-    #levelSelect {
-      padding: 6px 10px;
-      background: #222;
-      border: 1px solid #444;
-      border-radius: 5px;
-      color: #eee;
-      font-size: 0.82rem;
-      cursor: pointer;
-    }
-
-    #currentLevel {
-      color: #0af;
-      font-weight: 600;
-    }
-
-    #levelTable {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-
-    #levelTable th, #levelTable td {
-      text-align: left;
-      padding: 5px 8px;
-      border-bottom: 1px solid #2a2a2a;
-      color: #bbb;
-    }
-
-    #levelTable th { color: #666; font-weight: 500; }
-
-    #levelTable tr.active td { color: #0af; font-weight: 600; }
-
     #credit {
       width: 100%;
-      max-width: 860px;
+      max-width: 1280px;
       margin-top: 16px;
       font-size: 0.78rem;
       color: #555;
@@ -159,22 +108,10 @@
     <button id="loadBtn">Load</button>
   </div>
 
-  <video id="video" controls></video>
-  <p id="status"></p>
-
-  <div id="abrPanel">
-    <h2>ABR / Quality Levels</h2>
-    <div class="abr-row">
-      <label>Mode:</label>
-      <select id="levelSelect"><option value="-1">Auto (ABR)</option></select>
-      <label>Active level:</label>
-      <span id="currentLevel">—</span>
-    </div>
-    <table id="levelTable">
-      <thead><tr><th>#</th><th>Resolution</th><th>Bitrate</th><th>Codec</th></tr></thead>
-      <tbody id="levelBody"></tbody>
-    </table>
+  <div class="video-shell">
+    <video id="video" controls></video>
   </div>
+  <p id="status"></p>
 
   <p id="credit">
     Demo asset: <strong>Tears of Steel</strong> &mdash;
@@ -195,10 +132,7 @@
 
     let hls = null;
 
-    const abrPanel    = document.getElementById('abrPanel');
-    const levelSelect = document.getElementById('levelSelect');
-    const currentLevelEl = document.getElementById('currentLevel');
-    const levelBody   = document.getElementById('levelBody');
+    let maxLevelInfo = 'unknown';
 
     function setStatus(msg, isError) {
       status.textContent = msg;
@@ -210,34 +144,10 @@
       return bps >= 1e6 ? (bps / 1e6).toFixed(2) + ' Mbps' : Math.round(bps / 1e3) + ' kbps';
     }
 
-    function buildLevelUI(levels) {
-      // Populate select
-      levelSelect.innerHTML = '<option value="-1">Auto (ABR)</option>';
-      levelBody.innerHTML = '';
-      levels.forEach((l, i) => {
-        const res  = (l.width && l.height) ? l.width + '×' + l.height : '—';
-        const bps  = fmtBitrate(l.bitrate);
-        const codec = l.videoCodec || l.audioCodec || '—';
-        const opt  = document.createElement('option');
-        opt.value  = i;
-        opt.textContent = i + ': ' + res + ' @ ' + bps;
-        levelSelect.appendChild(opt);
-        const tr = document.createElement('tr');
-        tr.id = 'lvl-' + i;
-        tr.innerHTML = '<td>' + i + '</td><td>' + res + '</td><td>' + bps + '</td><td>' + codec + '</td>';
-        levelBody.appendChild(tr);
-      });
-      abrPanel.style.display = 'block';
-    }
-
-    function updateActiveLevel(idx) {
-      if (idx < 0 || !hls) return;
-      const l = hls.levels[idx];
-      const res = (l && l.width && l.height) ? l.width + '×' + l.height : idx;
-      currentLevelEl.textContent = idx + ': ' + res + ' @ ' + fmtBitrate(l ? l.bitrate : 0);
-      document.querySelectorAll('#levelTable tr').forEach(r => r.classList.remove('active'));
-      const row = document.getElementById('lvl-' + idx);
-      if (row) row.classList.add('active');
+    function fmtLevel(level) {
+      if (!level) return 'unknown quality';
+      const res = (level.width && level.height) ? (level.width + '×' + level.height) : 'unknown res';
+      return res + ' @ ' + fmtBitrate(level.bitrate);
     }
 
     function loadStream(url) {
@@ -247,31 +157,33 @@
       // Tear down previous instance
       if (hls) { hls.destroy(); hls = null; }
       video.src = '';
-      abrPanel.style.display = 'none';
-      levelSelect.innerHTML = '<option value="-1">Auto (ABR)</option>';
-      levelBody.innerHTML = '';
-      currentLevelEl.textContent = '—';
+      maxLevelInfo = 'unknown';
       setStatus('Loading…');
 
       if (Hls.isSupported()) {
         hls = new Hls({
-          startLevel: -1,          // let ABR choose the first level
-          abrEwmaDefaultEstimate: 500000,  // conservative initial BW estimate
-          capLevelToPlayerSize: true       // never request higher res than player size
+          startLevel: -1,                 // always start in auto ABR mode
+          testBandwidth: true,
+          abrEwmaDefaultEstimate: 5000000,
+          abrBandWidthFactor: 0.95,
+          abrBandWidthUpFactor: 0.9,
+          capLevelToPlayerSize: false     // allow upswitch beyond viewport (e.g., 4K)
         });
         hls.loadSource(url);
         hls.attachMedia(video);
+        hls.autoLevelCapping = -1;
 
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
-          buildLevelUI(hls.levels);
-          currentLevelEl.textContent = 'Auto — waiting…';
-          setStatus('Manifest loaded — ' + hls.levels.length + ' quality level(s). Playing.');
+          const top = hls.levels[hls.levels.length - 1];
+          maxLevelInfo = fmtLevel(top);
+          setStatus('Auto ABR enabled — ' + hls.levels.length + ' quality level(s). Max: ' + maxLevelInfo + '.');
           video.play().catch(() => {});
         });
 
         // Fired by ABR controller whenever the active rendition changes
         hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
-          updateActiveLevel(data.level);
+          const active = hls.levels[data.level];
+          setStatus('Auto ABR active: ' + fmtLevel(active) + ' (Max available: ' + maxLevelInfo + ')');
         });
 
         hls.on(Hls.Events.ERROR, (_, data) => {
@@ -302,17 +214,6 @@
         setStatus('HLS is not supported in this browser.', true);
       }
     }
-
-    // Manual quality override
-    levelSelect.addEventListener('change', () => {
-      if (hls) {
-        hls.currentLevel = parseInt(levelSelect.value, 10);
-        if (hls.currentLevel === -1) {
-          currentLevelEl.textContent = 'Auto — waiting…';
-          document.querySelectorAll('#levelTable tr').forEach(r => r.classList.remove('active'));
-        }
-      }
-    });
 
     loadBtn.addEventListener('click', () => loadStream(urlInput.value));
 
