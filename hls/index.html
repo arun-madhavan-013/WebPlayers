@@ -157,6 +157,7 @@
       // Tear down previous instance
       if (hls) { hls.destroy(); hls = null; }
       video.src = '';
+      document.querySelector('.video-shell').style.aspectRatio = '16 / 9';
       maxLevelInfo = 'unknown';
       setStatus('Loading…');
 
@@ -164,9 +165,9 @@
         hls = new Hls({
           startLevel: -1,                 // always start in auto ABR mode
           testBandwidth: true,
-          abrEwmaDefaultEstimate: 5000000,
-          abrBandWidthFactor: 0.95,
-          abrBandWidthUpFactor: 0.9,
+          abrEwmaDefaultEstimate: 25000000,
+          abrBandWidthFactor: 1.0,
+          abrBandWidthUpFactor: 0.98,
           capLevelToPlayerSize: false     // allow upswitch beyond viewport (e.g., 4K)
         });
         hls.loadSource(url);
@@ -176,7 +177,12 @@
         hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
           const top = hls.levels[hls.levels.length - 1];
           maxLevelInfo = fmtLevel(top);
-          setStatus('Auto ABR enabled — ' + hls.levels.length + ' quality level(s). Max: ' + maxLevelInfo + '.');
+          const has4k = !!(top && top.width >= 3840 && top.height >= 2160);
+          const maxNote = has4k ? '4K+ available.' : 'No 4K variant in this manifest.';
+          setStatus('Auto ABR enabled — ' + hls.levels.length + ' quality level(s). Max: ' + maxLevelInfo + '. ' + maxNote);
+
+          // Hint ABR to probe the top level early; ABR can still drop if bandwidth cannot sustain it.
+          hls.nextAutoLevel = hls.levels.length - 1;
           video.play().catch(() => {});
         });
 
@@ -214,6 +220,12 @@
         setStatus('HLS is not supported in this browser.', true);
       }
     }
+
+    video.addEventListener('loadedmetadata', () => {
+      if (video.videoWidth && video.videoHeight) {
+        document.querySelector('.video-shell').style.aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
+      }
+    });
 
     loadBtn.addEventListener('click', () => loadStream(urlInput.value));
 
