@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>M3U8 Player</title>
+  <title>HLS Player</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -163,12 +163,12 @@
 
       if (Hls.isSupported()) {
         hls = new Hls({
-          startLevel: -1,                 // always start in auto ABR mode
+          startLevel: 0,
           testBandwidth: true,
-          abrEwmaDefaultEstimate: 25000000,
-          abrBandWidthFactor: 1.0,
-          abrBandWidthUpFactor: 0.98,
-          capLevelToPlayerSize: false     // allow upswitch beyond viewport (e.g., 4K)
+          abrEwmaDefaultEstimate: 3000000,
+          abrBandWidthFactor: 0.85,
+          abrBandWidthUpFactor: 0.7,
+          capLevelToPlayerSize: true
         });
         hls.loadSource(url);
         hls.attachMedia(video);
@@ -179,17 +179,17 @@
           maxLevelInfo = fmtLevel(top);
           const has4k = !!(top && top.width >= 3840 && top.height >= 2160);
           const maxNote = has4k ? '4K+ available.' : 'No 4K variant in this manifest.';
-          setStatus('Auto ABR enabled — ' + hls.levels.length + ' quality level(s). Max: ' + maxLevelInfo + '. ' + maxNote);
-
-          // Hint ABR to probe the top level early; ABR can still drop if bandwidth cannot sustain it.
-          hls.nextAutoLevel = hls.levels.length - 1;
+          setStatus('Auto ABR enabled — starts at lowest quality and ramps up gradually. ' + hls.levels.length + ' quality level(s). Max: ' + maxLevelInfo + '. ' + maxNote);
           video.play().catch(() => {});
         });
 
         // Fired by ABR controller whenever the active rendition changes
         hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
           const active = hls.levels[data.level];
-          setStatus('Auto ABR active: ' + fmtLevel(active) + ' (Max available: ' + maxLevelInfo + ')');
+          const activeRes = active && active.width && active.height ? (active.width + '×' + active.height) : 'unknown res';
+          const activeBitrate = fmtBitrate(active && active.bitrate ? active.bitrate : 0);
+          const estBandwidth = fmtBitrate(hls.bandwidthEstimate || 0);
+          setStatus('Auto ABR active: ' + activeBitrate + ' (' + activeRes + ', estimated bandwidth: ' + estBandwidth + ', Max available: ' + maxLevelInfo + ')');
         });
 
         hls.on(Hls.Events.ERROR, (_, data) => {
