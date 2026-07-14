@@ -183,6 +183,13 @@
 			status.classList.toggle("error", isError);
 		}
 
+		function ensureDefaultFocus() {
+			if (button.disabled) {
+				return;
+			}
+			button.focus({ preventScroll: true });
+		}
+
 		async function callJsonApi(url, payload, useCorsMode) {
 			const headers = useCorsMode
 				? { "Content-Type": "text/plain;charset=UTF-8" }
@@ -248,7 +255,13 @@
 		window.addEventListener("resize", fitTo1080pCanvas);
 		button.addEventListener("click", runFlow);
 		fitTo1080pCanvas();
-		button.focus();
+		ensureDefaultFocus();
+		window.addEventListener("load", () => {
+			requestAnimationFrame(ensureDefaultFocus);
+			setTimeout(ensureDefaultFocus, 120);
+			setTimeout(ensureDefaultFocus, 350);
+		});
+		window.addEventListener("pageshow", ensureDefaultFocus);
 	</script>
 </body>
 </html>

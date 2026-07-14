@@ -127,6 +127,10 @@
 			statusEl.classList.toggle("error", isError);
 		}
 
+		function ensureDefaultFocus() {
+			backBtn.focus({ preventScroll: true });
+		}
+
 		const params = new URLSearchParams(window.location.search);
 		const src = params.get("src");
 
@@ -148,6 +152,14 @@
 		backBtn.addEventListener("click", () => {
 			window.location.href = "./index.html";
 		});
+
+		ensureDefaultFocus();
+		window.addEventListener("load", () => {
+			requestAnimationFrame(ensureDefaultFocus);
+			setTimeout(ensureDefaultFocus, 120);
+			setTimeout(ensureDefaultFocus, 350);
+		});
+		window.addEventListener("pageshow", ensureDefaultFocus);
 	</script>
 </body>
 </html>
