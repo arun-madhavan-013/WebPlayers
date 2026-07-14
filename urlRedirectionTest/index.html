@@ -183,10 +183,13 @@
 		}
 
 		async function callJsonApi(url, payload, useCorsMode) {
+			const headers = useCorsMode
+				? { "Content-Type": "text/plain;charset=UTF-8" }
+				: { "Content-Type": "application/json" };
 			const res = await fetch(url, {
 				method: "POST",
 				mode: useCorsMode ? "cors" : "same-origin",
-				headers: { "Content-Type": "application/json" },
+				headers,
 				body: JSON.stringify(payload)
 			});
 			if (!res.ok) {
@@ -213,7 +216,17 @@
 						scope: "device"
 					}
 				};
-				const response = await callJsonApi(requestUrl, payload, useCors.checked);
+				let response;
+				try {
+					response = await callJsonApi(requestUrl, payload, useCors.checked);
+				} catch (error) {
+					if (useCors.checked) {
+						setStatus("Direct CORS call failed. Retrying via local proxy...");
+						response = await callJsonApi(PROXY_JSON_RPC_URL, payload, false);
+					} else {
+						throw error;
+					}
+				}
 				console.log("JSON-RPC response:" + JSON.stringify(response));
 
 				const nextPageUrl = response?.result?.value;
