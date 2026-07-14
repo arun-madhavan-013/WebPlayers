@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Welcome</title>
+	<style>
+		:root {
+			--bg-1: #f2efe7;
+			--bg-2: #e7f0ea;
+			--ink: #1f2a24;
+			--accent: #0e7a4f;
+			--accent-2: #0a5f3d;
+			--card: rgba(255, 255, 255, 0.8);
+			--danger: #b42318;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			overflow: hidden;
+			font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+			background:
+				radial-gradient(1200px 700px at 8% 12%, rgba(14, 122, 79, 0.18), transparent 62%),
+				radial-gradient(900px 600px at 85% 75%, rgba(10, 95, 61, 0.14), transparent 60%),
+				linear-gradient(140deg, var(--bg-1), var(--bg-2));
+			color: var(--ink);
+		}
+
+		.viewport {
+			width: 100vw;
+			height: 100vh;
+			display: grid;
+			place-items: center;
+			overflow: hidden;
+		}
+
+		.screen {
+			width: 1920px;
+			height: 1080px;
+			transform-origin: top left;
+			position: relative;
+			display: grid;
+			place-items: center;
+			padding: 64px;
+		}
+
+		.panel {
+			width: 680px;
+			min-height: 380px;
+			background: var(--card);
+			border: 1px solid rgba(31, 42, 36, 0.12);
+			border-radius: 24px;
+			box-shadow: 0 24px 64px rgba(20, 28, 24, 0.16);
+			padding: 48px;
+			display: grid;
+			gap: 20px;
+			align-content: center;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 54px;
+			line-height: 1.06;
+			letter-spacing: 0.3px;
+		}
+
+		p {
+			margin: 0;
+			font-size: 24px;
+			line-height: 1.4;
+			color: rgba(31, 42, 36, 0.85);
+		}
+
+		.actions {
+			display: flex;
+			gap: 16px;
+			align-items: center;
+			flex-wrap: wrap;
+			margin-top: 12px;
+		}
+
+		.cors-toggle {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			font-size: 20px;
+			font-weight: 600;
+			color: rgba(31, 42, 36, 0.9);
+			user-select: none;
+		}
+
+		.cors-toggle input {
+			width: 20px;
+			height: 20px;
+		}
+
+		button {
+			appearance: none;
+			border: 0;
+			border-radius: 14px;
+			padding: 18px 28px;
+			font-size: 24px;
+			font-weight: 700;
+			color: #fff;
+			background: linear-gradient(135deg, var(--accent), var(--accent-2));
+			cursor: pointer;
+			transition: transform 0.18s ease, filter 0.18s ease, opacity 0.18s ease;
+		}
+
+		button:hover {
+			filter: brightness(1.05);
+			transform: translateY(-1px);
+		}
+
+		button:active {
+			transform: translateY(0);
+		}
+
+		button:disabled {
+			opacity: 0.65;
+			cursor: not-allowed;
+			transform: none;
+		}
+
+		.status {
+			min-height: 30px;
+			font-size: 22px;
+			color: rgba(31, 42, 36, 0.75);
+		}
+
+		.status.error {
+			color: var(--danger);
+		}
+	</style>
+</head>
+<body>
+	<div class="viewport">
+		<main class="screen" id="screen">
+			<section class="panel">
+				<h1>Welcome</h1>
+				<p>Press continue to call the required APIs, then open the next page.</p>
+
+				<div class="actions">
+					<button id="continueBtn" type="button">Continue</button>
+					<label class="cors-toggle" for="useCors">
+						<input id="useCors" type="checkbox" />
+						Use CORS
+					</label>
+				</div>
+
+				<div id="status" class="status" aria-live="polite"></div>
+			</section>
+		</main>
+	</div>
+
+	<script>
+		const DESIGN_WIDTH = 1920;
+		const DESIGN_HEIGHT = 1080;
+
+		const DIRECT_JSON_RPC_URL = "http://10.0.0.151:9998/jsonrpc";
+		const PROXY_JSON_RPC_URL = "/jsonrpc";
+
+		const screen = document.getElementById("screen");
+		const button = document.getElementById("continueBtn");
+		const useCors = document.getElementById("useCors");
+		const status = document.getElementById("status");
+
+		function fitTo1080pCanvas() {
+			const scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
+			screen.style.transform = `scale(${scale})`;
+		}
+
+		function setStatus(message, isError = false) {
+			status.textContent = message;
+			status.classList.toggle("error", isError);
+		}
+
+		async function callJsonApi(url, payload, useCorsMode) {
+			const res = await fetch(url, {
+				method: "POST",
+				mode: useCorsMode ? "cors" : "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload)
+			});
+			if (!res.ok) {
+				throw new Error(`API failed (${res.status}) at ${url}`);
+			}
+			console.log("API response:", await res.clone().text());
+			return res.json();
+		}
+
+		async function runFlow() {
+			button.disabled = true;
+			setStatus("Calling PersistentStore API...");
+
+			try {
+				const requestUrl = useCors.checked ? DIRECT_JSON_RPC_URL : PROXY_JSON_RPC_URL;
+				const response = await callJsonApi(requestUrl, {
+					jsonrpc: "2.0",
+					id: 42,
+					method: "org.rdk.PersistentStore.getValue",
+					params: {
+						namespace: "ns1",
+						key: "appurl",
+						scope: "device"
+					}
+				}, useCors.checked);
+
+				const nextPageUrl = response?.result?.value;
+				if (!nextPageUrl) {
+					throw new Error("No URL found in response.result.value.");
+				}
+
+				setStatus("Opening next page...");
+				window.location.href = nextPageUrl;
+			} catch (error) {
+				setStatus(error.message || "Something went wrong.", true);
+				button.disabled = false;
+			}
+		}
+
+		window.addEventListener("resize", fitTo1080pCanvas);
+		button.addEventListener("click", runFlow);
+		fitTo1080pCanvas();
+	</script>
+</body>
+</html>
