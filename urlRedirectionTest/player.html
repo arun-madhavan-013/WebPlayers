@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Playback</title>
+	<style>
+		:root {
+			--bg-1: #0f1115;
+			--bg-2: #1a1e25;
+			--ink: #e8ecf3;
+			--muted: rgba(232, 236, 243, 0.72);
+			--accent: #2aa27f;
+			--card: rgba(255, 255, 255, 0.06);
+			--danger: #ff6b6b;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			margin: 0;
+			width: 100%;
+			height: 100%;
+			font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+			color: var(--ink);
+			background:
+				radial-gradient(900px 500px at 85% 10%, rgba(42, 162, 127, 0.24), transparent 60%),
+				linear-gradient(160deg, var(--bg-1), var(--bg-2));
+		}
+
+		.app {
+			min-height: 100%;
+			display: grid;
+			grid-template-rows: auto 1fr auto;
+			gap: 16px;
+			padding: 20px;
+		}
+
+		.header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 12px;
+		}
+
+		h1 {
+			margin: 0;
+			font-size: 28px;
+			letter-spacing: 0.2px;
+		}
+
+		button {
+			appearance: none;
+			border: 0;
+			border-radius: 10px;
+			padding: 10px 14px;
+			font-size: 16px;
+			font-weight: 700;
+			color: #fff;
+			background: var(--accent);
+			cursor: pointer;
+		}
+
+		.player-shell {
+			background: var(--card);
+			border: 1px solid rgba(255, 255, 255, 0.12);
+			border-radius: 14px;
+			overflow: hidden;
+			display: grid;
+			place-items: center;
+			min-height: 240px;
+		}
+
+		video {
+			width: 100%;
+			height: 100%;
+			max-height: calc(100vh - 190px);
+			background: #000;
+		}
+
+		.status {
+			font-size: 16px;
+			color: var(--muted);
+			min-height: 22px;
+		}
+
+		.status.error {
+			color: var(--danger);
+		}
+
+		@media (max-width: 700px) {
+			h1 {
+				font-size: 22px;
+			}
+
+			button {
+				font-size: 15px;
+				padding: 9px 12px;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="app">
+		<header class="header">
+			<h1>Playback</h1>
+			<button id="backBtn" type="button" autofocus>Back</button>
+		</header>
+
+		<div class="player-shell">
+			<video id="video" controls autoplay playsinline></video>
+		</div>
+
+		<p id="status" class="status" aria-live="polite"></p>
+	</div>
+
+	<script>
+		const statusEl = document.getElementById("status");
+		const backBtn = document.getElementById("backBtn");
+		const video = document.getElementById("video");
+
+		function setStatus(message, isError = false) {
+			statusEl.textContent = message;
+			statusEl.classList.toggle("error", isError);
+		}
+
+		const params = new URLSearchParams(window.location.search);
+		const src = params.get("src");
+
+		if (!src) {
+			setStatus("Missing media URL.", true);
+		} else {
+			video.src = src;
+			setStatus("Loading media...");
+		}
+
+		video.addEventListener("loadedmetadata", () => {
+			setStatus("Playing media.");
+		});
+
+		video.addEventListener("error", () => {
+			setStatus("Media failed to load or play on this device.", true);
+		});
+
+		backBtn.addEventListener("click", () => {
+			window.location.href = "./index.html";
+		});
+	</script>
+</body>
+</html>

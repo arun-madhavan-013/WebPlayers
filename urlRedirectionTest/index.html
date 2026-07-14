@@ -166,6 +166,7 @@
 
 		const DIRECT_JSON_RPC_URL = "http://localhost:9998/jsonrpc";
 		const PROXY_JSON_RPC_URL = "/jsonrpc";
+		const PLAYER_PAGE_URL = "./player.html";
 
 		const screen = document.getElementById("screen");
 		const button = document.getElementById("continueBtn");
@@ -235,8 +236,9 @@
 				}
 
 				setStatus("Opening next page...");
-				console.log(`Redirecting to ${nextPageUrl}`);
-				window.location.href = nextPageUrl;
+				const playerUrl = `${PLAYER_PAGE_URL}?src=${encodeURIComponent(nextPageUrl)}`;
+				console.log(`Opening player page ${playerUrl} for source ${nextPageUrl}`);
+				window.location.href = playerUrl;
 			} catch (error) {
 				setStatus(error.message || "Something went wrong.", true);
 				button.disabled = false;
