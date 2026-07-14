@@ -148,7 +148,7 @@
 				<p>Press continue to call the required APIs, then open the next page.</p>
 
 				<div class="actions">
-					<button id="continueBtn" type="button">Continue</button>
+					<button id="continueBtn" type="button" autofocus>Continue</button>
 					<label class="cors-toggle" for="useCors">
 						<input id="useCors" type="checkbox" />
 						Use CORS
@@ -229,6 +229,7 @@
 		window.addEventListener("resize", fitTo1080pCanvas);
 		button.addEventListener("click", runFlow);
 		fitTo1080pCanvas();
+		button.focus();
 	</script>
 </body>
 </html>
